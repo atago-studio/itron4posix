@@ -1,6 +1,4 @@
-CC=gcc
-CFLAGS = -g -O -c -fPIC -I../include
-AR=ar
+CFLAGS = -O -c -fPIC -I../include
 ARFLAGS = crsv
 
 objs = common.o exsync.o mempool.o sync.o task.o time.o
