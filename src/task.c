@@ -44,7 +44,7 @@ typedef struct {						/* task management structure 		*/
 
 /***** global valiable *****/
 static int giPrimin, giPrimax;
-static T_TSK_MAN gsTskman[TMAX_TSK_ID];
+static T_TSK_MAN gsTskman[TMAX_TSK_ID + 1];
 static pthread_key_t gsKey;
 static const ER (*gftRelWai[])(ID taskid) =	/* object release func */
     {
@@ -788,10 +788,7 @@ ER isig_tsk(void)
 	ER res, err;
 
 	for (tskid = 0, res = E_OK; tskid < TMAX_TSK_ID; tskid++){
-		if (tsk_lock(tskid) != E_OK){
-			continue;
-		}
-		if ((gsTskman[tskid].stat & TTS_WAS) != 0 && gsTskman[tskid].waitim.utime >= 0){
+		if ((gsTskman[tskid].stat & TTS_WAS) != 0 && gsTskman[tskid].waitim.utime >= 0 && tsk_lock(tskid) == E_OK){
 			if (gsTskman[tskid].waitim.ltime == 1 && gsTskman[tskid].waitim.utime == 0){
 				gsTskman[tskid].waitim.ltime = 0;
 				gsTskman[tskid].stat &= ~TTS_WAI;                                                                                       /* reset flags */
@@ -804,8 +801,8 @@ ER isig_tsk(void)
 				}
 				gsTskman[tskid].waitim.ltime--;
 			}
+			tsk_unlock(tskid);
 		}
-        tsk_unlock(tskid);
 	}
 	return res;
 }
