@@ -30,8 +30,8 @@ typedef struct {						/* alarm handler management info 	*/
 } T_ALM_MAN;
 
 /***** global valiable *****/
-static T_CYC_MAN gsCycman[TMAX_CYC_ID];
-static T_ALM_MAN gsAlmman[TMAX_ALM_ID];
+static T_CYC_MAN gsCycman[TMAX_CYC_ID + 1];
+static T_ALM_MAN gsAlmman[TMAX_ALM_ID + 1];
 static pthread_mutex_t gsCycmtx, gsAlmmtx;
 static SYSTIM gSystim;
 

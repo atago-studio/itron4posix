@@ -47,10 +47,10 @@ typedef struct {						/* established randezvous info structure */
 } T_RDV_MAN;
 
 /***** global valiable *****/
-static T_MTX_MAN gsMtxman[TMAX_MTX_ID];
-static T_MBF_MAN gsMbfman[TMAX_MBF_ID];
-static T_POR_MAN gsPorman[TMAX_POR_ID];
-static T_RDV_MAN gsRdvman[TMAX_RDV_NO];
+static T_MTX_MAN gsMtxman[TMAX_MTX_ID + 1];
+static T_MBF_MAN gsMbfman[TMAX_MBF_ID + 1];
+static T_POR_MAN gsPorman[TMAX_POR_ID + 1];
+static T_RDV_MAN gsRdvman[TMAX_RDV_NO + 1];
 static RDVNO gRdvnum;
 static pthread_mutex_t gsMtxmtx, gsMbfmtx, gsRdvmtx;
 
