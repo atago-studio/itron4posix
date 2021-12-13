@@ -10,6 +10,9 @@
 #define TCD_MTX_NOLOC (-1)
 #define TCD_MTX_NONE 0
 
+/***** macro definision *****/
+#define PCHKMTX(cond, ret, mtx) if (!(cond)){pthread_mutex_unlock(mtx);  return ret;}
+
 /***** structure definision *****/
 typedef struct {						/* task locking mutex info struct	*/
 	ID mtxid;							/* mutex id							*/
@@ -45,11 +48,11 @@ typedef struct {						/* task management structure 		*/
 /***** global valiable *****/
 static int giPrimin, giPrimax;
 static T_TSK_MAN gsTskman[TMAX_TSK_ID + 1];
-static pthread_key_t gsKey;
 static const ER (*gftRelWai[])(ID taskid) =	/* object release func */
     {
     };
-    
+static pthread_mutex_t gsTskmtx = PTHREAD_MUTEX_INITIALIZER;
+
 /***** local function prototype *****/
 ER isig_tsk(void);
 
@@ -78,7 +81,6 @@ void inz_tsk(void)
 	memset(&gsTskman[0], 0, sizeof(gsTskman));
 	giPrimin = sched_get_priority_min(SCHED_FIFO);
 	giPrimax = sched_get_priority_max(SCHED_FIFO);
-    err = pthread_key_create(&gsKey, tsk_destructor);
 }
 
 ER cre_tsk(
@@ -89,16 +91,20 @@ ER cre_tsk(
 	ER err;
 	
 	PCHK(1 <= tskid && tskid <= TMAX_TSK_ID, E_ID);
-	PCHK(gsTskman[tskid].stat == 0, E_OBJ);
-	PCHK(pk_ctsk != NULL && giPrimin <= pk_ctsk->itskpri && pk_ctsk->itskpri < giPrimax, E_PAR);
-	PCHK(pk_ctsk->task != NULL && pk_ctsk->stksz < TMAX_STKSZ, E_PAR);
-	PCHK(TA_HLNG <= (pk_ctsk->tskatr & ~TA_ACT) && (pk_ctsk->tskatr & ~TA_ACT) <= TA_ASM, E_RSATR);
+	PCHK(pthread_mutex_lock(&gsTskmtx) == 0, E_SYS);
+	PCHKMTX(gsTskman[tskid].stat == 0, E_OBJ, &gsTskmtx);
+	PCHKMTX(pk_ctsk != NULL && giPrimin <= pk_ctsk->itskpri && pk_ctsk->itskpri < giPrimax, E_PAR, &gsTskmtx);
+	PCHKMTX(pk_ctsk->task != NULL && pk_ctsk->stksz < TMAX_STKSZ, E_PAR, &gsTskmtx);
+	PCHKMTX(TA_HLNG <= (pk_ctsk->tskatr & ~TA_ACT) && (pk_ctsk->tskatr & ~TA_ACT) <= TA_ASM, E_RSATR, &gsTskmtx);
 	err = cre_tskobj(tskid, pk_ctsk->itskpri);
-	PCHK(err == E_OK, err);
+	PCHKMTX(err == E_OK, err, &gsTskmtx);
+	PCHK(pthread_mutex_lock(&gsTskman[tskid].mutex) == 0, E_SYS);
+	PCHK(pthread_mutex_unlock(&gsTskmtx) == 0, E_SYS);
 	gsTskman[tskid].stat = TTS_DMT;
 	gsTskman[tskid].ctsk = *pk_ctsk;
 	gsTskman[tskid].tskbpri = pk_ctsk->itskpri;
 	gsTskman[tskid].tskpri = pk_ctsk->itskpri;
+	PCHK(pthread_mutex_unlock(&gsTskman[tskid].mutex) == 0, E_SYS);
 	if ((pk_ctsk->tskatr & TA_ACT) == 0){
 		return E_OK;
 	}else{
@@ -117,18 +123,25 @@ ER_ID acre_tsk(
 	PCHK(pk_ctsk != NULL && giPrimin <= pk_ctsk->itskpri && pk_ctsk->itskpri < giPrimax, E_PAR);
 	PCHK(pk_ctsk->task != NULL && pk_ctsk->stksz < TMAX_STKSZ, E_PAR);
 	PCHK(TA_HLNG <= (pk_ctsk->tskatr & ~TA_ACT) && (pk_ctsk->tskatr & ~TA_ACT) <= TA_ASM, E_RSATR);
-	for (i = 1; i < TMAX_TSK_ID; i++){
+	PCHK(pthread_mutex_lock(&gsTskmtx) == 0, E_SYS);
+	for (i = 1; i <= TMAX_TSK_ID; i++){
 		if (gsTskman[i].stat == 0){
 			break;
 		}
 	}
-	PCHK(i < TMAX_TSK_ID, E_NOID);
+	if (i > TMAX_TSK_ID){
+		PCHK(pthread_mutex_unlock(&gsTskmtx) == 0, E_SYS);
+		return E_NOID;
+	}
 	err = cre_tskobj(i, pk_ctsk->itskpri);
 	PCHK(err == E_OK, err);
+	PCHK(pthread_mutex_lock(&gsTskman[i].mutex) == 0, E_SYS);
+	PCHK(pthread_mutex_unlock(&gsTskmtx) == 0, E_SYS);
 	gsTskman[i].stat = TTS_DMT;
 	gsTskman[i].ctsk = *pk_ctsk;
 	gsTskman[i].tskbpri = pk_ctsk->itskpri;
 	gsTskman[i].tskpri = pk_ctsk->itskpri;
+	PCHK(pthread_mutex_unlock(&gsTskman[i].mutex) == 0, E_SYS);
 	if ((pk_ctsk->tskatr & TA_ACT) != 0){
 		err = act_tsk(i);
 	}
@@ -142,9 +155,11 @@ ER del_tsk(
 	)
 {
 	PCHK(1 <= tskid && tskid <= TMAX_TSK_ID, E_ID);
-	PCHK(gsTskman[tskid].stat != 0, E_NOEXS);
-	PCHK(gsTskman[tskid].stat == TTS_DMT, E_OBJ);
+	PCHK(pthread_mutex_lock(&gsTskmtx) == 0, E_SYS);
+	PCHKMTX(gsTskman[tskid].stat != 0, E_NOEXS, &gsTskmtx);
+	PCHKMTX(gsTskman[tskid].stat == TTS_DMT, E_OBJ, &gsTskmtx);
 	memset(&gsTskman[tskid], 0, sizeof(T_TSK_MAN));
+	PCHK(pthread_mutex_unlock(&gsTskmtx) == 0, E_SYS);
 	return E_OK;
 }
 
@@ -220,10 +235,12 @@ ER sta_tsk(
 //	PCHK(tskid == TSK_SELF, E_OBJ);
 	PCHK(1 <= tskid && tskid <= TMAX_TSK_ID, E_ID);
 	PCHK(gsTskman[tskid].stat != 0, E_NOEXS);
+    PCHK(tsk_lock(tskid) == E_OK, E_SYS);
 	PCHK(gsTskman[tskid].stat == TTS_DMT, E_OBJ);
 	gsTskman[tskid].stacd = stacd;
 	PCHK(pthread_create(&gsTskman[tskid].pth, NULL, tsk_thread, (VP)tskid) == 0, E_SYS);
 	gsTskman[tskid].stat = TTS_RUN;
+    PCHK(tsk_unlock(tskid) == E_OK, E_SYS);
 	return E_OK;
 }
 
@@ -643,15 +660,18 @@ ER get_tid(
     )
 {
     ER res;
-    ID *tid;
-    
-    tid = (ID *)pthread_getspecific(gsKey);
-    if (tid == NULL){
+    ID tskid;
+    INT err;
+	
+	for (tskid = 1, *p_tskid = 0; tskid <= TMAX_TSK_ID; tskid++){
+		if (gsTskman[tskid].pth == pthread_self()){
+			*p_tskid = tskid;
+			res = E_OK;
+			break;
+		}
+	}
+    if (*p_tskid == 0){
         res = E_SYS;
-        *p_tskid = TSK_NONE;
-    }else{
-        res = E_OK;
-        *p_tskid = *tid;
     }
     return res;
 }
@@ -812,18 +832,22 @@ static ER tsk_lock(
     ID tskid
     )
 {
-    ER res;
+    ER res = E_OK;
     INT err = 0;
 
     if (tskid == TSK_SELF){
         PCHK(get_tid(&tskid) == E_OK, E_SYS);
     }
-//	if (gsTskman[tskid].loctsk != tskid || gsTskman[tskid].locnt == 0){		// 2015.03.18 comment out
+	PCHK(pthread_mutex_lock(&gsTskmtx) == 0, E_SYS);
+	if (gsTskman[tskid].stat != 0){
 		err = pthread_mutex_lock(&gsTskman[tskid].mutex);
-//	}
-	gsTskman[tskid].loctsk = tskid;
-	gsTskman[tskid].locnt++;
-    res = (err == 0)? E_OK : E_SYS;
+	} else {
+		res = E_NOEXS;
+	}
+	PCHK(pthread_mutex_unlock(&gsTskmtx) == 0, E_SYS);
+//	gsTskman[tskid].loctsk = tskid;
+//	gsTskman[tskid].locnt++;
+    res = (err == 0)? res : E_SYS;
     return res;
 }
 
@@ -832,18 +856,21 @@ static ER tsk_unlock(
     ID tskid
     )
 {
-    ER res;
+    ER res = E_OK;
     INT err = 0;
 
     if (tskid == TSK_SELF){
         PCHK(get_tid(&tskid) == E_OK, E_SYS);
     }
-	gsTskman[tskid].locnt = (gsTskman[tskid].locnt > 0)? gsTskman[tskid].locnt - 1 : 0;
+//	gsTskman[tskid].locnt = (gsTskman[tskid].locnt > 0)? gsTskman[tskid].locnt - 1 : 0;
 //	if (gsTskman[tskid].locnt == 0){
-		gsTskman[tskid].loctsk = TSK_NONE;
+//		gsTskman[tskid].loctsk = TSK_NONE;
+	if (gsTskman[tskid].stat != 0){
 		err = pthread_mutex_unlock(&gsTskman[tskid].mutex);
-//	}
-    res = (err == 0)? E_OK : E_SYS;
+	} else {
+		res = E_NOEXS;
+	}
+    res = (err == 0)? res : E_SYS;
     return res;
 }
 
@@ -871,9 +898,8 @@ static ER cre_tskobj(
 ERR_EXIT3:
     err = pthread_mutex_destroy(&gsTskman[tskid].mutex);
 ERR_EXIT2:
-	err = pthread_key_delete(gsTskman[tskid].key);
-ERR_EXIT1:
 	err = pthread_attr_destroy(&gsTskman[tskid].pthatr);
+ERR_EXIT1:
 	return E_SYS;
 }
 
@@ -914,9 +940,15 @@ static TASK tsk_thread(
 	int err;
 
 	tskid = (ID)p_tskid;
-	EREXIT(err, pthread_setspecific(gsKey, &gsTskman[tskid].tskid), ERR_EXIT);
+	EREXIT(err, pthread_key_create(&gsTskman[tskid].key, tsk_destructor), ERR_EXIT1);
+	EREXIT(err, pthread_setspecific(gsTskman[tskid].key, &gsTskman[tskid].tskid), ERR_EXIT2);
 	gsTskman[tskid].ctsk.task(gsTskman[tskid].stacd);
-	return;
-ERR_EXIT:
+	gsTskman[tskid].stat = TTS_DMT;
+	pthread_exit(NULL);
+
+ERR_EXIT2:
+	pthread_key_delete(gsTskman[tskid].key);
+ERR_EXIT1:
+	gsTskman[tskid].stat = TTS_DMT;
 	pthread_exit(NULL);
 }

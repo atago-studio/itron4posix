@@ -137,8 +137,8 @@ ER cre_cyc(
 	
 	PCHK(1 <= cycid && cycid <= TMAX_CYC_ID, E_ID);
 	PCHK(pk_ccyc != NULL, E_PAR);
-	PCHK(!(pk_ccyc->cycatr & (TA_ASM | TA_PHS)), E_NOSPT);
-	PCHK(pk_ccyc->cycatr & ~(TA_HLNG | TA_STA), E_PAR);
+	PCHK((pk_ccyc->cycatr & (TA_ASM | TA_PHS)) == 0, E_NOSPT);
+	PCHK((pk_ccyc->cycatr & ~(TA_HLNG | TA_STA)) == 0, E_PAR);
 	PCHK(pthread_mutex_lock(&gsCycmtx) == 0, E_SYS);
 	EREXIT(res, (gsCycman[cycid].created == FALSE)? E_OK : E_OBJ, ERR_EXIT);
     EREXIT(res, (pthread_mutex_init(&gsCycman[cycid].mutex, NULL) == 0)? E_OK : E_SYS, ERR_EXIT);
@@ -163,8 +163,8 @@ ER_ID acre_cyc(
 	ER_ID res, i;
 	
 	PCHK(pk_ccyc != NULL, E_PAR);
-	PCHK(!(pk_ccyc->cycatr & (TA_ASM | TA_PHS)), E_NOSPT);
-	PCHK(!(pk_ccyc->cycatr & ~(TA_HLNG | TA_STA)), E_PAR);
+	PCHK((pk_ccyc->cycatr & (TA_ASM | TA_PHS)) == 0, E_NOSPT);
+	PCHK((pk_ccyc->cycatr & ~(TA_HLNG | TA_STA)) == 0, E_PAR);
 	PCHK(pthread_mutex_lock(&gsCycmtx) == 0, E_SYS);
 	for (i = 1; i <= TMAX_CYC_ID; i++){
 		if (gsCycman[i].created == TRUE){
@@ -294,7 +294,7 @@ ER cre_alm(
 	
 	PCHK(1 <= almid && almid <= TMAX_ALM_ID, E_ID);
 	PCHK(pk_calm != NULL, E_PAR);
-	PCHK(pk_calm->almatr & TA_HLNG, E_NOSPT);
+	PCHK((pk_calm->almatr & TA_HLNG) != 0, E_NOSPT);
 	PCHK(pthread_mutex_lock(&gsAlmmtx) == 0, E_SYS);
 	EREXIT(res, (gsAlmman[almid].created == FALSE)? E_OK : E_OBJ, ERR_EXIT);
     EREXIT(res, (pthread_mutex_init(&gsAlmman[almid].mutex, NULL) == 0)? E_OK : E_SYS, ERR_EXIT);
@@ -318,7 +318,7 @@ ER_ID acre_alm(
 	ER_ID res, i;
 	
 	PCHK(pk_calm != NULL, E_PAR);
-	PCHK(pk_calm->almatr & TA_HLNG, E_NOSPT);
+	PCHK((pk_calm->almatr & TA_HLNG) != 0, E_NOSPT);
 	PCHK(pthread_mutex_lock(&gsAlmmtx) == 0, E_SYS);
 	for (i = 1; i <= TMAX_ALM_ID; i++){
 		if (gsAlmman[i].created == TRUE){
