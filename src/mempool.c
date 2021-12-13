@@ -46,8 +46,8 @@ typedef struct {						/* memory pool management info		*/
 } T_MPL_MAN;
 
 /***** global valiable *****/
-static T_MPF_MAN gsMpfman[TMAX_MPF_ID];
-static T_MPL_MAN gsMplman[TMAX_MPL_ID];
+static T_MPF_MAN gsMpfman[TMAX_MPF_ID + 1];
+static T_MPL_MAN gsMplman[TMAX_MPL_ID + 1];
 static pthread_mutex_t gsMpfmtx, gsMplmtx;
 
 /***** functions *****/

@@ -45,10 +45,10 @@ typedef struct {						/* mailbox management structure		*/
 } T_MBX_MAN;
 
 /***** global valiable *****/
-static volatile T_SEM_MAN gsSemman[TMAX_SEM_ID];
-static volatile T_FLG_MAN gsFlgman[TMAX_FLG_ID];
-static volatile T_DTQ_MAN gsDtqman[TMAX_DTQ_ID];
-static volatile T_MBX_MAN gsMbxman[TMAX_MBX_ID];
+static volatile T_SEM_MAN gsSemman[TMAX_SEM_ID + 1];
+static volatile T_FLG_MAN gsFlgman[TMAX_FLG_ID + 1];
+static volatile T_DTQ_MAN gsDtqman[TMAX_DTQ_ID + 1];
+static volatile T_MBX_MAN gsMbxman[TMAX_MBX_ID + 1];
 static volatile pthread_mutex_t gsSemmtx, gsFlgmtx, gsDtqmtx, gsMbxmtx;
 
 /***** local function prototype *****/
